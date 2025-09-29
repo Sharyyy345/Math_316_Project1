@@ -1,0 +1,1 @@
+# Project 1 for MATH316 at IUP (Fall 2025)
