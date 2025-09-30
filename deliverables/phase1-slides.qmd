@@ -80,3 +80,38 @@ df3 = df3.transpose()
 table4 = GT(df3)
 table4.tab_header(title='HPAI Cases by Month')
 ```
+
+```{python}
+
+df4 = df2['Year Detected'].value_counts(ascending=False).to_frame(name='HPAI Cases')
+df4.index = df4.index.astype(int)
+df4 = df4.sort_index(ascending=True)
+df4 = df4.transpose()
+
+table5 = GT(df4)
+table5.tab_header(title='HPAI Cases by Year')
+```
+
+```{python}
+n=10
+df5 = df2['Bird Species'].value_counts(ascending=False).head(n=n).to_frame(name='HPAI Cases')
+df5 = df5.transpose()
+
+table6 = GT(df5)
+table6.tab_header(title=f'Top {n} Birds with Most HPAI Cases')
+```
+
+## 3 Main Questions
+1. What will the forecast for each HPAI strain be for the next 6 months in each state?
+2. What HPAI strains are most commonly found in birds collected as deceased?
+3. Is there a correlation between time of year and number and location of HPAI cases?
+
+## Sources
+- https://my.clevelandclinic.org/health/diseases/22401-bird-flu4
+- https://www.vet.cornell.edu/highly-pathogenic-avian-influenza-bird-flu-resource-center/avian-influenza-bird-flu-fact-sheet
+- https://agr.wa.gov/departments/animals-livestock-and-pets/avian-health/avian-influenza
+
+## The End!
+- Questions?
+- Comments?
+- Suggestions?
