@@ -1,0 +1,82 @@
+---
+title: "MATH316 Project 1, Phase 1 Summary"
+format:
+    revealjs:
+        theme: default
+        embed-resources: true
+        slide-number: c/t
+        show-slide-number: all
+---
+
+```{python}
+#| label: setup
+#| include: false
+
+from great_tables import GT # for pretty table displays
+import pandas as pd
+
+dataset_path = '../data/HPAI Detections in Wild Birds.csv'
+hpai_data = pd.read_csv(dataset_path)
+```
+
+## Background
+- Highly Pathogenic Avian Influenza (HPAI) - virus that primarily affects birds but can spread to humans and other animals
+- High mortality rate - about 50% for humans, 75-100% for poultry
+- Very contagious - spreads through bodily fluids, feces, air particles, and consumption of raw animal products
+- Hard to "cure" - infected birds must be euthanized, infections in humans can be treated with antiviral drugs
+
+## Dataset Description
+- Provided by [USDA](https://www.aphis.usda.gov/livestock-poultry-disease/avian/avian-influenza/hpai-detections/wild-birds)
+- Tracks cases/detections of HPAI in wild birds
+- Covers US states + counties from 2022-present
+
+## Basic Info
+```{python}
+n = 5
+table1 = GT(hpai_data.head(n=n))
+table1.tab_header(title="HPAI Cases in Wild Birds (US)", subtitle=f"First {n} rows of data")
+```
+- Mainly categorical data
+- 14,497 rows, 9 columns
+- 12 HPAI strains, 236 species of birds
+
+## Summary Statistics
+```{python}
+desc = hpai_data.describe()
+nulls = hpai_data.isnull().sum().to_frame(name='nulls').transpose()
+
+table2 = GT(pd.concat([desc, nulls]).reset_index(drop=False, names='statistic').replace('top','mode'))
+table2.tab_header(title='Summary Statistics')
+```
+
+## Key Variables
+- State - tells us where
+- Date Detected - tells us when (unlike Collection Date)
+- HPAI Strain - tells us what kind of infection
+- Bird Species - tells us who (birdwise) was infected
+- WOAH Classification - tells us what kind of bird was infected
+- Sampling Method - tells us how the infection was initially collected
+
+## Key Insights
+```{python}
+n = 10
+table3 = GT(hpai_data['State'].value_counts(ascending=False).head(n=n).to_frame(name='cases').T)
+table3.tab_header(title=f'Top {n} States with Most HPAI Cases')
+```
+
+```{python}
+df1 = hpai_data.copy()
+df1[['Month Detected', 'Day Detected', 'Year Detected']] = df1['Date Detected'].str.split('/', expand=True)
+
+df2 = df1.drop(columns=['Collection Date', 'Day Detected', 'Date Detected'])
+df2 = df2[['State','County','Year Detected','Month Detected','HPAI Strain','Bird Species','WOAH Classification','Sampling Method','Submitting Agency']]
+
+df3 = df2['Month Detected'].value_counts(ascending=False).to_frame(name='HPAI Cases')
+df3.index = df3.index.astype(int)
+df3 = df3.sort_index(ascending=True)
+df3.index = df3.index.map({1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July', 8: 'August', 9: 'September', 10: 'October', 11: 'November', 12: 'December'})
+df3 = df3.transpose()
+
+table4 = GT(df3)
+table4.tab_header(title='HPAI Cases by Month')
+```
