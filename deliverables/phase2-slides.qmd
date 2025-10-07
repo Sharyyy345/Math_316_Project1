@@ -1,0 +1,163 @@
+---
+title: "US HPAI Cases Dashboard"
+format:
+    dashboard:
+        theme: default
+        pages: true
+        orientation: columns
+        embed-resources: true
+        standalone: true
+---
+
+<!--
+
+Requirements:
+This project should include at least one visualization.
+Data arising from at least one groupby operation with aggregation/transformation.
+Data arising from at least one pivot_table or crosstab operation.
+
+-->
+
+```{python}
+#| label: setup
+#| include: false
+
+from great_tables import GT # for pretty table displays
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import us
+
+dataset_path = '../data/HPAI Detections in Wild Birds.csv'
+hpai_data = pd.read_csv(dataset_path)
+```
+
+<!-- Page 1 -->
+# Background
+- Highly Pathogenic Avian Influenza (HPAI) - virus that primarily affects birds but can spread to humans and other animals
+- High mortality rate - about 50% for humans, 75-100% for poultry
+- Very contagious - spreads through bodily fluids, feces, air particles, and consumption of raw animal products
+- Hard to "cure" - infected birds must be euthanized, infections in humans can be treated with antiviral drugs
+- USDA provides up-to-date data from 2022-present on HPAI detections in US
+
+<!-- Page 2 -->
+# Revised Research Questions
+1. What will the forecast for each HPAI strain be for the next 6 months in each state?
+2. What is the spread of sample collection times for states and agencies?
+3. Is there a correlation between geographic region, season, and number of HPAI cases?
+
+<!-- Page 3 -->
+# HPAI Cases over Time
+
+::: {.panel-tabset}
+# Trend
+```{python}
+
+def parse_date(s):
+    try:
+        return pd.to_datetime(s, format='%m/%d/%Y', errors='coerce')
+    except:
+        return pd.NaT
+
+df1 = hpai_data.copy()
+
+df1['Date Detected'] = df1['Date Detected'].apply(parse_date)
+df1 = df1.dropna(subset=['Date Detected'])
+df1['year_month'] = df1['Date Detected'].dt.to_period('M')
+detections_per_month = df1.groupby('year_month').size()
+plt.figure(figsize=(12,6))
+detections_per_month.plot()
+plt.title('HPAI Cases over Time')
+plt.xlabel('Year-Month')
+plt.ylabel('Number of Cases')
+plt.grid(True)
+plt.tight_layout()
+plt.show();
+```
+
+# Distribution
+```{python}
+month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+df1['month'] = df1['Date Detected'].dt.month
+month_map = {i+1: name for i, name in enumerate(month_order)}
+df1['month_name'] = df1['month'].map(month_map)
+
+monthly_counts = df1.groupby(['year_month', 'month_name']).size().reset_index(name='cases')
+
+plt.figure(figsize=(10,6))
+sns.boxplot(x='month_name', y='cases', data=monthly_counts, order=month_order)
+plt.title('Distribution of HPAI Cases by Month (All Years)')
+plt.xlabel('Month')
+plt.ylabel('Number of Cases')
+plt.grid(True, axis='y')
+plt.tight_layout()
+plt.show();
+```
+:::
+
+<!-- Page 4 -->
+# Sample Collection Regularity
+```{python}
+df2 = hpai_data.copy()
+df2['Collection Date'] = df2['Collection Date'].apply(parse_date)
+df2 = df2.dropna(subset=['Collection Date', 'Submitting Agency'])
+df2['year'] = df2['Collection Date'].dt.year
+
+years = sorted(df2['year'].unique())
+for yr in years:
+    df_year = df2[df2['year'] == yr].copy()
+    df_year['month'] = df_year['Collection Date'].dt.month
+
+    if len(df_year['month'].unique()) < 6 or yr not in [2023,2024]:
+        continue
+
+    month_order = [1,2,3,4,5,6,7,8,9,10,11,12]
+    month_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    agency_month_counts = df_year.pivot_table(index='Submitting Agency', columns='month', aggfunc='size', fill_value=0)
+
+    top_agencies = agency_month_counts.sum(axis=1).nlargest(10).index
+    agency_month_counts = agency_month_counts.loc[top_agencies]
+
+    plt.figure(figsize=(12,6))
+    sns.heatmap(agency_month_counts, cmap='PiYG', linewidths=0.5, xticklabels=month_labels, annot=True, annot_kws={'size':7}, fmt='d')
+    plt.title(f'Top 10 Agencies: Samples Collected per Month ({yr})')
+    plt.xlabel('Month')
+    plt.ylabel('Submitting Agency')
+    plt.tight_layout()
+plt.show();
+```
+
+<!-- Page 5 -->
+# HPAI Cases by Year and Region
+```{python}
+# US Census region mapping
+region_map = {
+    'Northeast': ['CT', 'ME', 'MA', 'NH', 'RI', 'VT', 'NJ', 'NY', 'PA'],
+    'Midwest': ['IL', 'IN', 'MI', 'OH', 'WI', 'IA', 'KS', 'MN', 'MO', 'NE', 'ND', 'SD'],
+    'South': ['DE', 'FL', 'GA', 'MD', 'NC', 'SC', 'VA', 'DC', 'WV', 'AL', 'KY', 'MS', 'TN', 'AR', 'LA', 'OK', 'TX'],
+    'West': ['AZ', 'CO', 'ID', 'MT', 'NV', 'NM', 'UT', 'WY', 'AK', 'CA', 'HI', 'OR', 'WA']
+}
+state_to_region = {}
+for region, states in region_map.items():
+    for state in states:
+        state_to_region[state] = region
+
+df3 = hpai_data.copy()
+df3['Date Detected'] = df3['Date Detected'].apply(parse_date)
+df3 = df3.dropna(subset=['Date Detected'])
+df3['Year Detected'] = df3['Date Detected'].dt.year
+
+df3['State Abbr'] = df3['State'].apply(lambda x: us.states.lookup(x).abbr if us.states.lookup(x) else x)
+df3['Region'] = df3['State Abbr'].map(state_to_region)
+
+region_year_counts = df3.groupby(['Year Detected', 'Region']).size().reset_index(name='Cases')
+
+plt.figure(figsize=(10,6))
+sns.barplot(data=region_year_counts, x='Year Detected', y='Cases', hue='Region')
+plt.title('HPAI Cases by Year and Region')
+plt.ylabel('HPAI Cases')
+plt.xlabel('Year')
+plt.legend(title='Region')
+plt.tight_layout()
+plt.show();
+```
