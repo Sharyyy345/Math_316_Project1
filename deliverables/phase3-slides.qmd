@@ -1,0 +1,43 @@
+---
+title: "US HPAI Cases Dashboard"
+format:
+    dashboard:
+        theme: default
+        pages: true
+        orientation: columns
+        embed-resources: true
+        standalone: true
+---
+
+# Background
+- Highly Pathogenic Avian Influenza (HPAI) - virus that primarily affects birds but can spread to humans and other animals
+- High mortality rate - about 50% for humans, 75-100% for poultry
+- Very contagious - spreads through bodily fluids, feces, air particles, and consumption of raw animal products
+- Hard to "cure" - infected birds must be euthanized, infections in humans can be treated with antiviral drugs
+- USDA provides up-to-date data from 2022-present on HPAI detections in US
+
+# Research Questions
+1. How does the frequency with which agencies collect samples affect the number of HPAI cases detected?
+    - Which agencies collect samples most frequently?
+    - When do agencies collect samples most frequently (time of year)?
+    - Where do agencies collect samples most frequently (geographic region)?
+2. Is there a correlation between geographic region and season, and number of HPAI cases?
+    - How does agency collection frequency influence and location affect this correlation?
+3. What is the forecast of HPAI cases in the US (all states) for the next 6 months?
+    - How does agency collection frequency and location affect this correlation?
+
+# Agency Collection Frequency
+Tabset with 3 or 4 visuals
+Viz 1 - which agencies collect samples most frequently
+Viz 2 - when do agencies collect samples most frequently
+Viz 3 - where do agencies collect samples most frequently
+
+# Region, Season, and HPAI Cases
+Investigate correlation
+Tabset with 3 visuals
+Viz 1 - Cases by region
+Viz 2 - Cases by season
+Viz 3 - Cases by region + season combined w/ correlation coefficient
+
+# 6-month Forecast
+Forecast (somehow) next 6 months of HPAI cases across all US states
