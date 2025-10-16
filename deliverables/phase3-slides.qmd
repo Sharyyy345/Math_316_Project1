@@ -14,7 +14,8 @@ format:
 - High mortality rate - about 50% for humans, 75-100% for poultry
 - Very contagious - spreads through bodily fluids, feces, air particles, and consumption of raw animal products
 - Hard to "cure" - infected birds must be euthanized, infections in humans can be treated with antiviral drugs
-- USDA provides up-to-date data from 2022-present on HPAI detections in US
+- Most recent outbreak was in 2022, from a commercial flock in Indiana
+    - USDA provides up-to-date data from 2022-present on HPAI detections in US
 
 # Research Questions
 1. How does the frequency with which agencies collect samples affect the number of HPAI cases detected?
