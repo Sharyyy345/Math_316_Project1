@@ -9,36 +9,268 @@ format:
         standalone: true
 ---
 
+```{python}
+#| label: setup
+#| include: false
+
+from great_tables import GT # for pretty table displays
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import us
+
+dataset_path = '../data/HPAI Detections in Wild Birds.csv'
+hpai_data = pd.read_csv(dataset_path)
+
+region_map = {
+    'Northeast': ['CT', 'ME', 'MA', 'NH', 'RI', 'VT', 'NJ', 'NY', 'PA'],
+    'Midwest': ['IL', 'IN', 'MI', 'OH', 'WI', 'IA', 'KS', 'MN', 'MO', 'NE', 'ND', 'SD'],
+    'South': ['DE', 'FL', 'GA', 'MD', 'NC', 'SC', 'VA', 'DC', 'WV', 'AL', 'KY', 'MS', 'TN', 'AR', 'LA', 'OK', 'TX'],
+    'West': ['AZ', 'CO', 'ID', 'MT', 'NV', 'NM', 'UT', 'WY', 'AK', 'CA', 'HI', 'OR', 'WA']
+}
+
+state_to_region = {}
+for region, states in region_map.items():
+    for state in states:
+        state_to_region[state] = region
+
+df1 = hpai_data.copy()
+df1['State'] = df1['State'].apply(lambda x: us.states.lookup(x).abbr if us.states.lookup(x) else x)
+df1['Region'] = df1['State'].map(state_to_region)
+
+seasons_map = {
+    'Winter': ['Dec', 'Jan', 'Feb'],
+    'Spring': ['Mar', 'Apr', 'May'],
+    'Summer': ['Jun', 'Jul', 'Aug'],
+    'Fall': ['Sep', 'Oct', 'Nov']
+}
+
+def parse_date(s):
+    '''
+    Attempts to parse a date string of format 'MM/DD/YYYY' to a datetime.
+
+    If parsing fails, it returns pd.NaT (Not a Time).
+    '''
+
+    try:
+        return pd.to_datetime(s, format='%m/%d/%Y', errors='coerce')
+    except:
+        return pd.NaT
+
+month_to_season = {}
+for season, months in seasons_map.items():
+    for month in months:
+        month_to_season[month] = season
+
+df2 = df1.copy()
+
+# convert date strings to datetime objects
+# if parsing fails, the value will be set to pd.NaT because sometimes the date strings are invalid
+df2['Date Detected'] = df2['Date Detected'].apply(parse_date)
+df2['Collection Date'] = df2['Collection Date'].apply(parse_date)
+
+# extract detection month and year
+df2['Detection Month'] = pd.to_datetime(df2['Date Detected']).dt.strftime('%b')
+df2['Detection Year'] = pd.to_datetime(df2['Date Detected']).dt.strftime('%Y')
+
+# also extract collection month and year
+df2['Collection Month'] = pd.to_datetime(df2['Collection Date']).dt.strftime('%b')
+df2['Collection Year'] = pd.to_datetime(df2['Collection Date']).dt.strftime('%Y')
+
+# map detection month to season
+# use detection month because that's when the case is actually confirmed
+df2['Season'] = df2['Detection Month'].map(month_to_season)
+```
+
 # Background
 - Highly Pathogenic Avian Influenza (HPAI) - virus that primarily affects birds but can spread to humans and other animals
 - High mortality rate - about 50% for humans, 75-100% for poultry
 - Very contagious - spreads through bodily fluids, feces, air particles, and consumption of raw animal products
 - Hard to "cure" - infected birds must be euthanized, infections in humans can be treated with antiviral drugs
-- Most recent outbreak was in 2022, from a commercial flock in Indiana
+- Most recent outbreak was in Feb. 2022, in a commercial flock in Indiana
     - USDA provides up-to-date data from 2022-present on HPAI detections in US
 
 # Research Questions
-1. How does the frequency with which agencies collect samples affect the number of HPAI cases detected?
+1. How do agency sample collection habits affect the number of HPAI cases detected?
     - Which agencies collect samples most frequently?
     - When do agencies collect samples most frequently (time of year)?
     - Where do agencies collect samples most frequently (geographic region)?
-2. Is there a correlation between geographic region and season, and number of HPAI cases?
-    - How does agency collection frequency influence and location affect this correlation?
-3. What is the forecast of HPAI cases in the US (all states) for the next 6 months?
-    - How does agency collection frequency and location affect this correlation?
 
-# Agency Collection Frequency
-Tabset with 3 or 4 visuals
-Viz 1 - which agencies collect samples most frequently
-Viz 2 - when do agencies collect samples most frequently
-Viz 3 - where do agencies collect samples most frequently
+2. Is there an association between geographic region and season, and number of HPAI cases?
+    - How do agency collection habits influence this association?
 
-# Region, Season, and HPAI Cases
-Investigate correlation
-Tabset with 3 visuals
-Viz 1 - Cases by region
-Viz 2 - Cases by season
-Viz 3 - Cases by region + season combined w/ correlation coefficient
+3. What is the forecast for the number of HPAI cases in each region over the next 4 months?
+    - With consideration for agency collection frequency and its impact on case detection.
 
-# 6-month Forecast
-Forecast (somehow) next 6 months of HPAI cases across all US states
+# Agency Sample Collection Habits
+::: {.panel-tabset}
+# Collection Frequency
+```{python}
+df3 = df2.copy()
+df3 = df3.loc[df3['Collection Year'].isin(['2022','2023','2024','2025'])]
+
+df3 = df3.groupby(['Submitting Agency', 'Collection Year']).size().reset_index(name='Samples Collected').sort_values(by=['Samples Collected'], ascending=False)
+df3_pivot = df3.pivot_table(index='Submitting Agency', columns='Collection Year', values='Samples Collected', fill_value=0).sort_values(by=['2022','2023','2024','2025'], ascending=False)
+
+agency_totals = df3_pivot.sum(axis=1)
+year_totals = df3_pivot.sum(axis=0)
+df3_pivot['Total Samples'] = df3_pivot.sum(axis=1)
+df3_pivot['% of All Samples'] = round(agency_totals / year_totals.sum() * 100.0, ndigits=3)
+
+df3_pivot.head(n=10).drop(columns=['Total Samples', '% of All Samples']).plot.barh(stacked=True, figsize=(10, 6), title='Samples Collected by Agencies per Year')
+```
+
+- 100+ agencies total, top 10 for brevity
+- NWDP collects most samples by far each year (> 50% all)
+
+# Seasonal Habits
+```{python}
+df4 = df2.copy()
+df4 = df4.loc[df4['Collection Year'].isin(['2022','2023','2024','2025'])]
+
+df4 = df4.groupby(['Submitting Agency', 'Collection Year', 'Season']).size().reset_index(name='Samples Collected').sort_values(by=['Samples Collected'], ascending=False)
+
+df4_pivot = df4.pivot_table(index=['Submitting Agency', 'Season'], columns='Collection Year', values='Samples Collected', fill_value=0)
+
+agency_totals = df4_pivot.sum(axis=1)
+year_totals = df4_pivot.sum(axis=0)
+df4_pivot['Total Samples'] = df4_pivot.sum(axis=1)
+df4_pivot['% of Agency Samples'] = round(agency_totals / df3_pivot['Total Samples'] * 100.0, ndigits=3)
+df4_pivot['% of All Samples'] = round(agency_totals / year_totals.sum() * 100.0, ndigits=3)
+
+df4_pivot = df4_pivot.sort_values(by=['% of All Samples'], ascending=False)
+df4_pivot.head(n=15).to_html()
+```
+
+- NWDP Collects most samples in Winter and Fall, least in Summer
+- May be seasonal bias since NWDP is largest contributor but samples significantly less during Spring and Summer
+
+# Regional Habits
+```{python}
+df5 = df2.copy()
+df5 = df5.loc[df5['Collection Year'].isin(['2022','2023','2024','2025'])]
+df5 = df5.groupby(['Submitting Agency', 'Collection Year', 'Region']).size().reset_index(name='Samples Collected').sort_values(by=['Samples Collected'], ascending=False)
+
+df5_pivot = df5.pivot_table(index=['Submitting Agency', 'Region'], columns='Collection Year', values='Samples Collected', fill_value=0)
+
+agency_totals = df5_pivot.sum(axis=1)
+year_totals = df5_pivot.sum(axis=0)
+df5_pivot['Total Samples'] = df5_pivot.sum(axis=1)
+df5_pivot['% of Agency Samples'] = round(agency_totals / df3_pivot['Total Samples'] * 100.0, ndigits=3)
+df5_pivot['% of All Samples'] = round(agency_totals / year_totals.sum() * 100.0, ndigits=3)
+
+df5_pivot = df5_pivot.sort_values(by=['% of All Samples'], ascending=False)
+
+df5_pivot.head(n=15).to_html()
+```
+
+- NWDP collects most of its samples in Midwest, least in Northeast
+- May be regional bias since NWDP is largest contributor but samples significantly less from Northeast
+:::
+
+# Region and Season Associations
+::: {.panel-tabset}
+# Cases by Region
+```{python}
+df6 = df2.copy()
+df6 = df6.groupby(['Region', 'Detection Year']).size().reset_index(name='HPAI Cases').sort_values(by=['HPAI Cases'], ascending=False)
+df6_pivot = df6.pivot_table(index='Region', columns='Detection Year', values='HPAI Cases', fill_value=0)
+region_totals = df6_pivot.sum(axis=1)
+year_totals = df6_pivot.sum(axis=0)
+df6_pivot['Total Cases'] = df6_pivot.sum(axis=1)
+df6_pivot['% of All Cases'] = round(region_totals / year_totals.sum() * 100.0, ndigits=3)
+
+df6_pivot.drop(columns=['Total Cases', '% of All Cases']).plot(kind='barh', stacked=True, figsize=(10, 6), title='HPAI Cases by Region and Year')
+```
+
+- West (29.2% all) and Midwest (28.3% all) have most cases, Northeast (18.2% all) has least
+- NWDP is most active in Midwest, South, and West - may help explain higher case numbers
+- South has noticably less cases than Midwest and West despite heavy NWDP activity - may indicate lack of sampling in region by other agencies
+
+# Cases by Region and Season
+```{python}
+df7 = df2.copy()
+df7 = df7.loc[df7['Detection Year'].isin(['2022','2023','2024','2025'])]
+
+df7 = df7.groupby(['Region', 'Detection Year', 'Season']).size().reset_index(name='HPAI Cases').sort_values(by=['HPAI Cases'], ascending=False)
+df7_pivot = df7.pivot_table(index=['Region', 'Season'], columns='Detection Year', values='HPAI Cases', fill_value=0)
+
+region_and_season_totals = df7_pivot.sum(axis=1)
+year_totals = df7_pivot.sum(axis=0)
+df7_pivot['Total Cases'] = region_and_season_totals
+df7_pivot['% of Regional Cases'] = round(df7_pivot['Total Cases'] / df6_pivot['Total Cases'] * 100.0, ndigits=3)
+df7_pivot['% of All Cases'] = round(region_and_season_totals / year_totals.sum() * 100.0, ndigits=3)
+
+df7_pivot.drop(columns=['Total Cases', '% of Regional Cases', '% of All Cases']).plot(kind='barh', stacked=True, figsize=(10, 6), title='HPAI Cases by Region, Season, and Year')
+```
+
+- South-Winter has most cases (12.3% all), Northeast-Fall has least (2.6% all)
+- West has most cases in Fall and Winter
+- Midwest has most cases in Fall and Spring
+- Recall: NWDP most active in Midwest region and during Fall/Winter seasons in general
+:::
+
+# 1-Year Forecast
+::: {.panel-tabset}
+# Cases over Time
+```{python}
+forecast_df = df2.copy()
+forecast_df['Detection Year-Month'] = forecast_df['Date Detected'].dt.to_period('M')
+
+plt.figure(figsize=(12,6))
+forecast_df.groupby('Detection Year-Month').size().plot()
+plt.title('HPAI Cases over Time')
+plt.xlabel('Year-Month')
+plt.ylabel('Cases')
+plt.grid(True)
+plt.tight_layout()
+plt.show();
+```
+
+- Latest detection date: 09/19/2025
+- We want to forecast out to Sep. 1, 2026 (about 1 year)
+
+# Model
+- Seasonal Autoregressive Integrated Moving Average (SARIMA)
+- Seasonal (S) - focuses on relationship between current value and past value at prior seasonal period (e.g. 12 months ago)
+- Autoregressive (AR) - focuses on how past (lag) values affect current value
+- Integrated (I) - calculates difference between current and prior values to data maintain stationarity (constant mean/variance over time)
+- Moving Average (MA) - focuses on how past unexpected shocks (errors) affect current value
+
+# Forecast
+```{python}
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+
+forecast_df = df2.copy()
+forecast_df['Detection Year-Month'] = forecast_df['Date Detected'].dt.to_period('M')
+
+us_cases = forecast_df.groupby('Detection Year-Month').size()
+us_cases.index = us_cases.index.to_timestamp() # have to convert for models to work
+
+model = SARIMAX(
+    us_cases,
+    order=(3, 0, 2), # non-seasonal parameters (p, d, q)
+    seasonal_order=(1, 1, 1, 12) # seasonal parameters (P, D, Q, s)
+)
+results = model.fit()
+
+forecast = results.get_forecast(steps=12) # forecast 12 months ahead
+forecast_index = pd.date_range(start=us_cases.index[-1], periods=13, freq='ME')[1:] # adjust range for 12 months
+forecast_values = forecast.predicted_mean
+
+plt.figure(figsize=(12, 6))
+plt.plot(us_cases, label='Observed')
+plt.plot(forecast_index, forecast_values, label='Forecast', color='red')
+for x, y in zip(forecast_index, forecast_values):
+    plt.text(x, y, f'{y:.0f}', color='black', fontsize=10, ha='center', va='center')
+plt.title('HPAI Cases 1-Year Forecast')
+plt.xlabel('Year-Month')
+plt.ylabel('Cases')
+plt.legend()
+plt.grid()
+plt.tight_layout()
+plt.show();
+```
+
+- Gap is due to incomplete data for Sep. 2025
+:::
